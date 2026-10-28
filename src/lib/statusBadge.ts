@@ -219,6 +219,8 @@ export interface ImageGroupTracker {
 	track<T extends Element>(img: T): T
 	/** ページの読み込み完了（読み込み画面を閉じた）ときに呼ぶ。まだ読めていない画像があれば通知を出す。 */
 	finish(): void
+	/** 【SPAで追加】ページを離れるときに呼ぶ。出ている通知を消す（既存のサイトは、ページごと消えていた）。 */
+	dispose(): void
 }
 
 /**
@@ -270,6 +272,11 @@ export function createImageGroupTracker(label: string, order: number, showCount:
 					gaveUp = true
 					update()
 				}, 30 * 1000)
+		},
+		dispose() {
+			finished = true
+			gaveUp = true
+			update()
 		},
 	}
 }

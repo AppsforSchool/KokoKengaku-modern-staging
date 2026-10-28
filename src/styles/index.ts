@@ -5,6 +5,8 @@
 import './base.css'
 import './new/login.css'
 import './old/login.css'
+import './new/app.css'
+import './old/app.css'
 import './uiSwitch.css'
 import './new/dialog.css'
 import './old/dialog.css'

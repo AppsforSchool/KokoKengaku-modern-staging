@@ -53,6 +53,12 @@ interface Props {
 
 export function LoadingOverlay({ text, percent, hidden = false, watchStall = false }: Props) {
 	const [stallText, setStallText] = useState<string | null>(null)
+	const [stalled, setStalled] = useState(false) // 復旧ボタンは、一度出たら残す（既存の attachRecoveryButton と同じ）
+
+	// 段階の文言が更新されたら、停止の表示は、そちらで上書きされる（次の5秒おきの確認で、また出る）
+	useEffect(() => {
+		setStallText(null)
+	}, [text])
 
 	useEffect(() => {
 		if (!watchStall || hidden) return
@@ -60,6 +66,7 @@ export function LoadingOverlay({ text, percent, hidden = false, watchStall = fal
 		return perfWatchStall(
 			() => false, // 終わったら、このコンポーネントが外れて、後片付けで止まる
 			(seconds, label) => {
+				setStalled(true)
 				setStallText(
 					`読み込みに時間がかかっています（${seconds}秒経過）／最後に完了した段階: ${label}${envText ? '／' + envText : ''}`,
 				)
@@ -84,7 +91,7 @@ export function LoadingOverlay({ text, percent, hidden = false, watchStall = fal
 					<div id="loading-progress-bar-fill" className="loading-progress-bar-fill" style={{ width: `${clamped}%` }}></div>
 				</div>
 			)}
-			{stallText !== null && <RecoveryButton />}
+			{stalled && <RecoveryButton />}
 		</div>
 	)
 }

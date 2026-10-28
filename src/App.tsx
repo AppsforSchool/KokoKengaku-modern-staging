@@ -2,7 +2,8 @@ import { Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
 import { PerfRouteWatcher } from './components/PerfRouteWatcher'
 import LoginPage from './pages/LoginPage'
-import { HomePlaceholder, NotFoundPlaceholder, TalkPlaceholder } from './pages/Placeholders'
+import RoomListPage from './pages/RoomListPage'
+import { NotFoundPlaceholder, TalkPlaceholder } from './pages/Placeholders'
 
 // ★ ルート（仕様書 §6.1）。旧URLとの対応：
 //   index.html → #/login（ログインしていれば #/ へ）  /  app.html → #/  /  talk.html?id=ID → #/talk/ID
@@ -16,8 +17,8 @@ export default function App() {
 				<Route
 					path="/"
 					element={
-						<RequireAuth page="login">
-							<HomePlaceholder />
+						<RequireAuth page="app">
+							<RoomListPage />
 						</RequireAuth>
 					}
 				/>

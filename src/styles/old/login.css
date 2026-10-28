@@ -1,0 +1,483 @@
+:root {
+  --primary: #007AB7;
+  --primary-rgb: 0, 122, 183;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html {
+  font-size: 16px;
+}
+body {
+  font-family: "BIZ UDGothic", sans-serif;
+  background-color: #f0f2f5;
+  color: #333;
+  line-height: 1.6;
+  
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+main {
+  flex: 1;
+}
+
+.hidden {
+  display: none;
+}
+
+
+#loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  
+  padding: 1rem;
+}
+
+#loading-overlay h1 {
+  font-size: 4rem;
+  color: white;
+  font-weight: normal;
+}
+#loading-overlay p {
+  font-size: 0.9rem;
+  color: white;
+}
+
+
+#loading-overlay.hidden {
+  display: none;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8); /* 少し濃いめの黒 */
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.modal-content .title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  /*margin-bottom: 2rem;*/
+}
+.modal-content .close-button {
+  background-color: #eee;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  color: #333;
+  
+  width: 3rem;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+  text-align: center;
+}
+.modal-content .close-button:hover,
+.modal-content .close-button:focus {
+  color: #000;
+  background-color: #e0e0e0;
+  text-decoration: none;
+  cursor: pointer;
+}
+.modal-content img {
+    max-width: 100%; 
+    max-height: 80vh; /* ビューポートの高さの80%など、適切な値に調整 */
+    height: auto; /* アスペクト比を維持 */
+}
+
+#login-qr-reader {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#qr-login-modal #qr-login-failure {
+  /*margin-top: 1rem;*/
+}
+#qr-login-modal #qr-login-failure p {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+#qr-login-modal #qr-login-retry {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  
+  padding: 0.3rem;
+}
+
+#qr-login-modal #qr-login-success p {
+  font-weight: bold;
+}
+#qr-login-modal #qr-login-success span {
+  background-color: #eee;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  
+  border-radius: 5px;
+  text-align: center;
+}
+
+#app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem;
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+#header-title {
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+#share-modal-btn {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  
+  padding: 0.4rem;
+  margin: 0 0 0 0.8rem;
+  width: auto;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 0.3rem;
+  box-shadow: 0 4px 8px rgba(var(--primary-rgb), 0.25);
+}
+
+
+#login-container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 30px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+#login-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#login-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.login-subtitle {
+  font-size: 0.8rem;
+  padding-bottom: 1rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #ddd;
+}
+
+#to-pc {
+    display: block;
+}
+#to-sp {
+  display: none;
+}
+
+#id,
+#password {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 1.0rem;
+  
+  width: 100%;
+  max-width: 300px;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#id:hover,
+#password:hover {
+  border-color: #999;
+}
+
+#id:focus,
+#password:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.25);
+  outline: none;
+}
+
+#mail-address::placeholder,
+#password::placeholder {
+  color: #999;
+  opacity: 1;
+  font-weight: 700;
+}
+
+#qr-login-button {
+  color: var(--primary);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+#login-button,
+button#qr-login-button {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  
+  width: 100%;
+  max-width: 300px;
+  padding: 12px 20px;
+  margin: 20px 0 10px 0;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgba(var(--primary-rgb), 0.25);
+
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.1s ease;
+}
+
+#login-button:disabled {
+  background-color: #ccc;
+  box-shadow: none;
+}
+
+#error-message {
+  font-size: 0.8rem;
+  color: red;
+}
+
+
+footer {
+  background-color: #333;
+  color: white;
+  padding: 0.5rem 0;
+  text-align: center;
+  width: 100%;
+}
+footer p {
+  font-size: 0.7rem;
+}
+
+@media (max-width: 600px) {
+  
+  #to-pc {
+    display: none;
+  }
+  #to-sp {
+    display: block;
+  }
+}
+
+/* --- ヘッダー右側：シェア／アカウント情報 --- */
+#user-data {
+  display: flex;
+  align-items: center;
+}
+#setting-button {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+
+  padding: 0.4rem;
+  margin: 0 0 0 0.8rem;
+  width: auto;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  box-sizing: border-box;
+
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 0.3rem;
+  box-shadow: 0 4px 8px rgba(var(--primary-rgb), 0.25);
+}
+
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.drawer-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px; /* ドロワーの幅 */
+  max-width: 80%; /* 狭い画面での最大幅 */
+  height: 100%;
+  background-color: white;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+  z-index: 1000;
+  transform: translateX(100%); /* 初期状態：画面外に隠す */
+  transition: transform 0.3s ease;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.is-open {
+  transform: translateX(0); /* オープン状態：画面内に表示 */
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+.drawer-header p {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 0;
+  color: #333;
+}
+.drawer-close-button {
+  background-color: #eee;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  color: #333;
+  
+  width: 3rem;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+  text-align: center;
+}
+
+.drawer-content {
+  flex-grow: 1;
+  overflow-y: auto; /* コンテンツがはみ出たらスクロール */
+  padding-left: 5px;
+  padding-right: 10px; /* スクロールバーとの間隔 */
+}
+
+.drawer-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1.5px solid #eee;
+}
+.drawer-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0
+}
+.drawer-section p.title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--primary);
+  margin-top: 0;
+}
+.drawer-section p {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ================================================================
+   ★ モーダルのヘッダー（タイトル・閉じるボタン）を固定し、本文だけをスクロールさせる
+   HTML側で、ヘッダーの後ろの内容を <div class="modal-scroll-body"> で包んである。
+     .modal-content           … 縦に並べる箱（自分ではスクロールしない）
+       .modal-header          … 高さは内容のまま。縮まない＝常に一番上に見える
+       .modal-scroll-body     … 残りの高さを使い、はみ出たらここだけスクロール
+   以前の position: sticky ＋ 負のmargin 方式は、ブラウザごとの基準位置の違いで表示がずれたため、やめた。
+   ・:has() が使えない古いブラウザでは、このブロックは無視され、従来どおり「モーダル全体がスクロール」になる。
+   ・<div class="modal-scroll-body"> で包まれていないモーダル（JSで動的に作るもの等）も、従来どおり全体スクロール。
+   ================================================================ */
+.modal-content {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-content:has(> .modal-scroll-body) {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.modal-content:has(> .modal-scroll-body) > .modal-header {
+  flex: none;
+  margin: 0;
+  padding: 20px 20px 0.8rem;
+}
+.modal-content > .modal-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 20px 20px;
+}

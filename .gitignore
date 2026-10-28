@@ -1,0 +1,10 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+.env.local
+
+# サービスアカウントの鍵（絶対にコミットしない）
+key.json
+*-key.json
+service-account*.json

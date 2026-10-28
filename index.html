@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#007AB7">
+  <link rel="manifest" href="/manifest.json">
+  <title>高校見学</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Signika+Negative:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-512.png">
+  <link rel="apple-touch-icon" href="/icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-512.png">
+  <!-- ★ 新UI/旧UIの、最初の状態（描画前に決めて、ちらつきを防ぐ）。設定は localStorage の uiMode。未設定なら新UI。 -->
+  <script>
+    (function () {
+      var mode = "new";
+      try { var v = localStorage.getItem("uiMode"); if (v === "old" || v === "new") mode = v; } catch (e) { /* 既定値 */ }
+      var list = document.documentElement.classList;
+      list.toggle("ui-old", mode === "old");
+      list.toggle("ui-new", mode !== "old");
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+/* ★ 新UI/旧UIの切り替えトグルのスタイル。既存の uiSwitch.js が <style> として注入していたものを、そのまま移した。 */
+.ui-switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.ui-switch-label{font-weight:700;font-size:.95rem;color:var(--text,#333)}
+.ui-switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.ui-switch > input.ui-switch-input,.drawer .ui-switch > input.ui-switch-input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;box-shadow:none;background:transparent;z-index:1}
+.ui-switch-track{position:absolute;inset:0;border-radius:999px;background:#ccc;transition:background-color .25s var(--ease,ease)}
+.ui-switch-track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .25s var(--ease,ease)}
+.ui-switch-input:checked + .ui-switch-track{background:var(--primary,#007AB7)}
+.ui-switch-input:checked + .ui-switch-track::after{transform:translateX(20px)}
+.ui-switch-input:focus-visible + .ui-switch-track{outline:3px solid rgba(var(--primary-rgb,0,122,183),.35);outline-offset:2px}
+html.ui-old .ui-switch-track{border-radius:6px}
+html.ui-old .ui-switch-track::after{border-radius:4px}

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>移動中…</title>
+<script>
+  // ★ 旧URL（talk.html?id=ルームID）を、新しいルート（#/talk/ルームID）に変換して移動する。過去の通知・ブックマーク用。
+  //   id 以外の検索パラメータ（?authdebug=1 など）は、そのまま引き継ぐ。
+  var q = new URLSearchParams(location.search);
+  var id = q.get('id') || '';
+  q.delete('id');
+  var rest = q.toString();
+  location.replace('./index.html' + (rest ? '?' + rest : '') + '#/' + (id ? 'talk/' + encodeURIComponent(id) : ''));
+</script>
+</head>
+<body>移動中…</body>
+</html>

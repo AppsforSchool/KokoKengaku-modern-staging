@@ -1,0 +1,79 @@
+/* ---- サイト独自のalert/confirm用モーダル(AppDialog)：旧UI版 ----
+   appDialogStyle.css と同じHTML構造/IDに対する旧UIのデザイン（フラット・単色・小さめの角丸）。
+   このファイル単体で完結しており、var(--surface) などの新UI用の変数には依存しない。 */
+
+#app-dialog-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+#app-dialog-modal.hidden {
+  display: none;
+}
+#app-dialog-modal .modal-content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 15px;
+  width: 100%;
+  text-align: center;
+}
+
+.app-dialog-content {
+  max-width: 360px;
+}
+.app-dialog-title {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 0.6rem;
+}
+.app-dialog-message {
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.6;
+  white-space: pre-line;
+  margin-bottom: 1.2rem;
+}
+.app-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+#app-dialog-ok-button,
+#app-dialog-cancel-button {
+  font-family: "BIZ UDGothic", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.6rem;
+  width: 100%;
+  text-align: center;
+  cursor: pointer;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0.4rem;
+  transition: all 0.3s ease;
+}
+#app-dialog-ok-button {
+  background-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(var(--primary-rgb), 0.25);
+}
+#app-dialog-ok-button.app-dialog-danger {
+  background-color: #d64545;
+  box-shadow: 0 4px 8px rgba(214, 69, 69, 0.25);
+}
+#app-dialog-cancel-button {
+  background-color: #eee;
+  color: #333;
+}
+#app-dialog-cancel-button:hover {
+  background-color: #e0e0e0;
+}

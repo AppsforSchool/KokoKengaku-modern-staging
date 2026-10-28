@@ -1,0 +1,9 @@
+/* ★ 文書そのもの（<html>・<body>）の最小限の設定。
+   既存のCSSは「* { margin: 0 }」で <body> の余白も消していたが、SPAでは、このCSSがページの枠の中だけに限定されるため、
+   <html>・<body>・#root の余白は、ここで消す。ほかの見た目は、各ページの枠（.page-◯◯）の中のCSSが決める。 */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+}

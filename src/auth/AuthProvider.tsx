@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { User } from 'firebase/auth'
 import { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from '../firebase'
 import { perfMark } from '../lib/perf'
+import { logoutPush } from '../lib/push'
 
 // ★ ログインIDは、内部では「ID@appsforschool.com」のメールアドレスとして扱う（既存サイトと同じ）。
 const EMAIL_DOMAIN = '@appsforschool.com'
@@ -14,7 +15,7 @@ interface AuthValue {
 	/** ログイン状態がまだ確定していない間は true。 */
 	loading: boolean
 	login: (id: string, password: string) => Promise<void>
-	/** ログアウトする（全サイトで同時にログアウトになる。仕様）。通知の解除は、PushProvider を作るときに加える。 */
+	/** 通知を解除してから、ログアウトする（全サイトで同時にログアウトになる。仕様）。 */
 	logout: () => Promise<void>
 }
 
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	}, [])
 
 	const logout = useCallback(async () => {
+		await logoutPush() // この端末に、前のユーザー宛の通知が届き続けないようにする（既存のログアウトと同じ順序）
 		await signOut(auth)
 	}, [])
 

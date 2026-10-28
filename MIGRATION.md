@@ -1,6 +1,6 @@
 # 高校見学 SPA移行 — 現在地（会話をまたいで引き継ぐための記録）
 
-最終更新：フェーズ1a（土台）の納品時点
+最終更新：フェーズ1b（診断・通知）の納品時点
 
 ## 方針（確定）
 | 項目 | 決定 |
@@ -47,14 +47,31 @@
 | フェーズ | 内容 | 状態 |
 | --- | --- | --- |
 | 0 | 準備（質問、バックアップ、テスト用アカウント、検証用リポジトリ、確認チェックリスト） | 完了（画面録画は、ご自身で） |
-| 1a | 土台：Vite+React+TS、`firebase.ts`、`hedged`、`perf`（記録部分）、`recover`、認証、ダイアログ、新旧UI切り替え、読み込み画面、**ログイン画面**、CSSの限定、公開設定、旧URLリダイレクト | **この納品** |
-| 1b | `statusBadge`、`perf` の管理者向けパネル、`diag`、通知（`notify.js` → `PushProvider`）、プロフィール表示・編集、ユーザー一覧、`lib/imageUpload.ts`・`lib/push.ts` | 未着手 |
+| 1a | 土台：Vite+React+TS、`firebase.ts`、`hedged`、認証、ダイアログ、新旧UI切り替え、読み込み画面、**ログイン画面**、CSSの限定、公開設定、旧URLリダイレクト | 完了（動作確認済み） |
+| 1b | 診断・通知：`statusBadge`、`perf`（管理者向けパネル）、`diag`、`push`（`notify.js`）、`PushButton`、`imageUpload` | **この納品** |
+| 1c | プロフィール表示・編集、ユーザー一覧のモーダル（これらのCSSは `appStyle.css`・`talkStyle.css` にあるため、**2aでCSSを移すときに、一緒に移す**） | 2aに統合 |
 | 2a | ルーム一覧（`appStyle.css` と旧UI版） | 未着手 |
 | 2b | トーク画面（`talkStyle.css` と旧UI版）。下書き `messageDraft_<ID>`、編集・削除・転送・選択、既読、アンケート、返信ジャンプ、存在しないルームID | 未着手 |
 | 2f | 旧URLの互換確認、本番への反映 | 未着手 |
 | 3 | 問題投稿 | 未着手 |
 | 4 | 後片付け、APIキーのWorker化 | 未着手 |
 
+## 1bで作った部品と、ページ側の呼び方
+| 部品 | 場所 | ページ側の使い方（既存の呼び出し位置と同じ） |
+| --- | --- | --- |
+| 通知欄（左上の小さな通知） | `lib/statusBadge.ts` | ページを離れるとき、自分で作った通知は、自分で消す（SPAでは、通知欄が残るため） |
+| 計測 | `lib/perf.ts` | `perfMark` / `perfStart` / `perfSample` / `perfNote` はそのまま。画面を移ると、`PerfRouteWatcher` が計測を0から始め直す |
+| 計測パネル | `lib/perf.ts`、`lib/diag.ts` | 読み込み完了時に `perfNotifyReportAvailable({ isAdmin, page, diagnostics: () => runFirestoreDiagnostics(myUserId) })` |
+| 通知の初期化 | `lib/push.ts` の `startPush(userId)` | 自分のユーザー情報を取得した**あと**に呼ぶ（読み込みと並行）。読み込み完了時に `notifyPageLoadFinished()` |
+| 通知ボタン | `components/PushButton.tsx` | ドロワーに置く（`id="enable-push-button"`）。CSSの `.normal-button` は、`appStyle.css` を移すと効く |
+| 通知の送信 | `lib/push.ts` | `sendMessageNotification` / `sendPushToUsers` / `sendProfileChangeNotification`。通知のURLは、旧URL（`talk.html?id=`）のまま |
+| 画像アップロード | `lib/imageUpload.ts` | `uploadImageToImgbb(file)`。既存の2か所の同じ処理を、1つにまとめた |
+| ログアウト | `auth/AuthProvider.tsx` の `logout()` | `logoutPush()` → `signOut()` の順（既存と同じ） |
+
+### 既存との違い（意図したもの）
+- 診断の「通信方式」の表示：既存は「`?fs=` で切り替え可」と出していたが、切り替えを移していないため、「`long`（固定）」と出す。
+- 計測の「ブラウザ計測」と「通信が遅かったリソース」：ページを開いた直後の画面でだけ、ブラウザの計測を出す。あとから移った画面は、移った時点からの計測にする（既存は、画面ごとにページを読み込み直していたため、毎回0から）。
+
 ## 次にやること
-1. 1aの動作確認（確認チェックリスト 1・10・12 のうち、ログイン画面で確認できる分）。
-2. 結果を受けて、1bに進む。
+1. 1bの動作確認（仮のホームで：通知ボタン、テスト通知、管理者の「計測結果をみる」と通信診断）。
+2. 結果を受けて、2a（ルーム一覧）に進む。

@@ -41,6 +41,7 @@
 - `@keyframes` は、`名前__<新旧>-<ページ>` に改名され、`animation` の参照も直る。
 - `dialog.css` は、全ページ共通で、`html.ui-X .ui-page` に限定。**ページのCSSより後に読み込む**（`src/styles/index.ts`）。
 - ページのCSSを移したら、`src/styles/index.ts` に1行足す。
+- **ビルドの注意（2aで判明）**：既存のCSSには、ブラウザなら読み飛ばす無効な記述がある（例：`old_appStyle.css` の `//text-align: left;`）。ビルド時のCSS圧縮（lightningcss）は厳密でエラーにするため、`vite.config.ts` で `build.cssMinify: false` にしてある。`build/scopeCss.ts` も、宣言の先頭の `//…;` を取り除く。トーク画面のCSS（`talkStyle.css`・`old_talkStyle.css`）を移すときも、`tsx` で変換テストを行うこと。
 - **既知の注意**：`document.body.classList` を操作する既存コード（スクロール固定など）は、`body` のルールが外枠に当たるため、外枠に同じクラスを付ける形に直す。移植時に、`grep "document.body"` で洗い出す。
 
 ## 進み具合

@@ -119,6 +119,15 @@ const KEYFRAMES_AT = /^@(?:-webkit-)?keyframes\b/i
 const NESTING_AT = /^@(media|supports|layer|container|document)\b/i
 const ANIMATION_DECL = /((?:-webkit-)?animation(?:-name)?\s*:)([^;}]*)/gi
 
+/**
+ * 「//text-align: left;」のように、CSSでは無効な宣言（JavaScript流のコメント）を取り除く。
+ * ブラウザは、無効な宣言を、次の「;」まで読み飛ばす。ビルド時のCSS圧縮は厳密で、エラーにするため、同じ扱いにしておく。
+ * （宣言の先頭にある「//」だけが対象。url(https://…) のような、途中にある「//」は触らない）
+ */
+function dropInvalidSlashDeclarations(body: string): string {
+	return body.replace(/(^|;)(\s*)\/\/[^;]*(;|$)/g, '$1$2')
+}
+
 function renameAnimations(body: string, names: Map<string, string>): string {
 	if (names.size === 0) return body
 	return body.replace(ANIMATION_DECL, (_all, head: string, value: string) => {
@@ -203,7 +212,7 @@ function walk(text: string, scope: string, names: Map<string, string>): string {
 			if (body[k] === '{') throw new Error(`scopeCss: CSSのネストには対応していません: ${prelude.slice(0, 40)}`)
 		}
 		const selectors = splitTopLevel(prelude).map((sel) => scopeSelector(sel, scope))
-		out += `${selectors.join(',\n')} {${renameAnimations(body, names)}}\n`
+		out += `${selectors.join(',\n')} {${renameAnimations(dropInvalidSlashDeclarations(body), names)}}\n`
 	}
 	return out
 }

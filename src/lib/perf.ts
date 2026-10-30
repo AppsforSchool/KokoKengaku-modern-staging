@@ -29,6 +29,8 @@ export const perfNotes: string[] = []
 let lastMainEnd = 0 // 直前のメイン処理が終わった時刻（最初は、ページを開いた時点 = 0）
 let pageBase = 0 // この画面の計測を始めた時刻（最初の画面は 0）
 let reportNotified = false
+let reportBadge: { remove(): void } | null = null // 【SPAで追加】出している「計測結果をみる」ボタン。画面を移るときに消す
+let reportBadgeTimer: ReturnType<typeof setTimeout> | null = null
 let currentPageKey: string | null = null
 
 const now = () => performance.now()
@@ -105,6 +107,11 @@ export function perfBeginPage(key: string): void {
 	pageBase = now()
 	lastMainEnd = pageBase
 	reportNotified = false
+	// 【SPAで追加】前の画面の「計測結果をみる」ボタンを消す（既存は、ページごと消えていた）
+	if (reportBadgeTimer) clearTimeout(reportBadgeTimer)
+	reportBadgeTimer = null
+	if (reportBadge) reportBadge.remove()
+	reportBadge = null
 }
 
 // ---------- 表示用の整形 ----------
@@ -282,5 +289,10 @@ export function perfNotifyReportAvailable({
 
 	const badge = createButtonBadge('計測結果をみる', () => perfShowReport({ page, diagnostics }), 9)
 	badge.show()
-	setTimeout(() => badge.remove(), 60 * 1000) // 1分たったらフェードアウトして消す
+	reportBadge = badge
+	reportBadgeTimer = setTimeout(() => {
+		badge.remove() // 1分たったらフェードアウトして消す
+		if (reportBadge === badge) reportBadge = null
+		reportBadgeTimer = null
+	}, 60 * 1000)
 }

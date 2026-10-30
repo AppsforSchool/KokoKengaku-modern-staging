@@ -21,7 +21,7 @@ function injectStyle(): void {
 	const style = document.createElement('style')
 	style.id = 'status-badge-style'
 	style.textContent = [
-		'#status-badge-stack{position:fixed;left:12px;z-index:60;display:flex;flex-direction:column;align-items:flex-start;pointer-events:none}',
+		'#status-badge-stack{font-family:"BIZ UDGothic",sans-serif;position:fixed;left:12px;z-index:60;display:flex;flex-direction:column;align-items:flex-start;pointer-events:none}',
 		/* 通知どうしの間隔は gap ではなく margin-bottom にしている（消えるときに間隔ごと縮めて、きれいに詰めるため） */
 		'.status-badge{box-sizing:border-box;margin-bottom:6px;padding:.4rem .8rem;border-radius:10px;background:rgba(36,48,61,.9);color:#fff;font-size:.78rem;font-weight:700;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.2);white-space:nowrap}',
 		'.status-badge.hidden{display:none}',

@@ -572,6 +572,10 @@ export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomN
 		talkAreaRef,
 		/** 通知のタイトルに使うルーム名（②）。個人トークは、ルーム名なし。 */
 		getNotifyRoomTitle: () => (roomIsGroupRef.current ? roomTitleRef.current : ''),
+		/** ルームのメンバーID一覧（自分を含む）。メンバーの追加・削除（⑤）で更新する。 */
+		roomMembersRef,
+		/** 受信したメッセージの元データ（表示可否に関わらず全件）。返信先の調べ物に使う。 */
+		messagesByIdRef,
 		users,
 		notFoundMessage: NOT_FOUND_MESSAGE,
 	}

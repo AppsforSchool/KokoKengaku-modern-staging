@@ -5,8 +5,11 @@ import { Avatar } from '../components/Avatar'
 import { LoadingOverlay } from '../components/LoadingOverlay'
 import { PageShell } from '../components/PageShell'
 import { PushButton } from '../components/PushButton'
+import { clearMessageDraft, loadMessageDraft, saveMessageDraft } from '../features/talk/draft'
+import { ImageSendModal } from '../features/talk/ImageSendModal'
 import { MessageItem } from '../features/talk/MessageItem'
 import { ReadByModal, type ReadByTarget } from '../features/talk/ReadByModal'
+import { notifyRoom, sendImageMessage, sendTextMessage } from '../features/talk/sendMessage'
 import { useTalkRoom, type TalkRoomStart } from '../features/talk/useTalkRoom'
 import { ProfileModal, type ProfileTarget } from '../features/ProfileModal'
 import { db, doc, getDoc, hedged } from '../firebase'
@@ -18,8 +21,8 @@ import { useDialog } from '../ui/DialogProvider'
 import { UiSwitchSection } from '../ui/UiSwitchSection'
 
 // ★ トーク画面（既存の talk.html + talkScript.js と同じHTML構造・同じ挙動）。
-//   いまは「①表示と既読」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
-//     ② 送信（本文・返信・画像・下書き・通知）  ③ アンケート  ④ 編集・削除・転送・選択  ⑤ メンバー管理・グループのアイコン変更
+//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
+//     ③ アンケート  ④ 編集・削除・転送・選択  ⑤ メンバー管理・グループのアイコン変更
 //   ・ユーザー情報の確認 → 通知の初期化（並行）→ ルーム・メンバー情報 → メッセージ → 画像の読み込み待ち → 読み込み画面を閉じる、の順序は、既存と同じ。
 //   ・存在しないルームID：「指定されたトークルームは見つかりませんでした。」→ OKで一覧（#/）へ（既存からの、唯一の意図した挙動の変更）。
 
@@ -50,7 +53,13 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 	const profileToken = useRef(0)
 	const [readByTarget, setReadByTarget] = useState<ReadByTarget | null>(null)
 	const readByToken = useRef(0)
-	const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null) // 返信先（送信は②）
+	const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null) // 返信先
+	const replyToIdRef = useRef<string | null>(null) // 送信の処理が「いま」の返信先を読むための控え（既存の replyToId）
+	const [imageModalOpen, setImageModalOpen] = useState(false)
+	const [messageText, setMessageText] = useState('') // 入力中のメッセージ
+	const [sending, setSending] = useState(false)
+	const messageInputRef = useRef<HTMLTextAreaElement>(null)
+	const myNameRef = useRef('') // 通知の送信者名（既存は、ドロワーの表示名を読んでいた）
 	const [showBackButton, setShowBackButton] = useState(false)
 	const scrollBeforeJump = useRef<number | null>(null) // ジャンプ前のスクロール位置
 
@@ -65,6 +74,16 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 		},
 	})
 	const { hideOverlayOnly, talkAreaRef } = room
+	useEffect(() => {
+		myNameRef.current = myName
+	}, [myName])
+
+	// ルームごとの入力中メッセージの下書きを復元する
+	useEffect(() => {
+		if (!start) return
+		const savedDraft = loadMessageDraft(talkId)
+		if (savedDraft) setMessageText(savedDraft)
+	}, [start, talkId])
 
 	// ---- 画面に入ったとき ----
 	useEffect(() => {
@@ -168,9 +187,60 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 		setReadByTarget({ userIds, token: readByToken.current })
 	}, [])
 
+	/** 返信対象をセットし、メッセージ入力欄の上に「〇〇に返信」を表示する。 */
 	const startReply = useCallback((docId: string, userName: string) => {
+		replyToIdRef.current = docId
 		setReplyTo({ id: docId, name: userName })
+		if (messageInputRef.current) messageInputRef.current.focus()
 	}, [])
+
+	/** 返信状態を解除する。 */
+	const cancelReply = useCallback(() => {
+		replyToIdRef.current = null
+		setReplyTo(null)
+	}, [])
+
+	/** 現在のトークルームのメンバー（自分以外）へ新着通知を送る。失敗しても送信処理には影響しない。 */
+	const notifyThisRoom = (text: string, replyTargetId: string | null) =>
+		notifyRoom({
+			talkId,
+			myUserId,
+			myName: myNameRef.current,
+			roomTitle: room.getNotifyRoomTitle(),
+			memberIds: room.roomMembersRef.current,
+			text,
+			replyTargetId,
+			getMessage: (id) => room.messagesByIdRef.current[id],
+		})
+
+	const handleMessageChange = (value: string) => {
+		setMessageText(value)
+		saveMessageDraft(talkId, value)
+	}
+
+	const handleSendMessage = async () => {
+		const message = messageText.trim()
+		setSending(true)
+		const replyToSnapshot = replyToIdRef.current // 送信前に返信先IDを確定させておく
+		try {
+			await sendTextMessage({ talkId, myUserId, message, replyTo: replyToSnapshot })
+			void notifyThisRoom(message, replyToSnapshot) // 新着通知（待たない）
+			cancelReply() // 送信成功後は返信状態を解除
+			clearMessageDraft(talkId) // 送信成功後は下書きをリセット
+		} catch (error) {
+			console.log(error)
+		} finally {
+			setSending(false)
+			setMessageText('') // 失敗しても、入力欄は空にする（既存と同じ）
+		}
+	}
+
+	const handleSendImage = async (imageUrl: string, caption: string) => {
+		// 現在のトークルームに画像メッセージを追加（任意のキャプション付き）
+		await sendImageMessage({ talkId, myUserId, caption, imageUrl, replyTo: replyToIdRef.current })
+		void notifyThisRoom(caption || '📷 画像を送信しました', replyToIdRef.current) // 新着通知（待たない）
+		cancelReply() // 送信成功後は返信状態を解除
+	}
 
 	/** 指定したメッセージまでスクロールしてジャンプし、「元のメッセージにもどる」ボタンを表示する。 */
 	const jumpToMessage = useCallback(
@@ -221,6 +291,8 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 					</div>
 				</div>
 			</div>
+
+			<ImageSendModal open={imageModalOpen} onClose={() => setImageModalOpen(false)} onSend={handleSendImage} />
 
 			<ReadByModal target={readByTarget} onClose={() => setReadByTarget(null)} onOpenProfile={(userId) => openProfile(userId)} />
 
@@ -359,24 +431,31 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 
 					<div id="reply-preview-bar" className={replyTo ? undefined : 'hidden'}>
 						<p id="reply-preview-text">{replyTo ? `${replyTo.name}に返信` : ''}</p>
-						<span id="reply-preview-cancel" className="close-button" onClick={() => setReplyTo(null)}>
+						<span id="reply-preview-cancel" className="close-button" onClick={cancelReply}>
 							&times;
 						</span>
 					</div>
 
-					{/* 送信（②）は、あとの段階で動くようにする。それまでは、入力できない */}
 					<div id="message-add-area">
 						<div className="message-add-actions">
-							<button id="open-image-modal-button" title="画像を送信" disabled>
+							<button id="open-image-modal-button" title="画像を送信" onClick={() => setImageModalOpen(true)}>
 								画像
 							</button>
+							{/* 「質問」（アンケート）は、③で動くようにする */}
 							<button id="open-poll-modal-button" title="アンケートを作成" disabled>
 								質問
 							</button>
 						</div>
-						<textarea id="message-input" rows={5} placeholder="メッセージを入力" disabled></textarea>
-						<button id="message-add-button" disabled>
-							送信
+						<textarea
+							id="message-input"
+							ref={messageInputRef}
+							rows={5}
+							placeholder="メッセージを入力"
+							value={messageText}
+							onChange={(e) => handleMessageChange(e.target.value)}
+						></textarea>
+						<button id="message-add-button" disabled={sending || messageText.trim() === ''} onClick={() => void handleSendMessage()}>
+							{sending ? '送信中...' : '送信'}
 						</button>
 					</div>
 				</div>

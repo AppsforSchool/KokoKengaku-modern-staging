@@ -1,9 +1,16 @@
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useParams } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
 import { PerfRouteWatcher } from './components/PerfRouteWatcher'
 import LoginPage from './pages/LoginPage'
 import RoomListPage from './pages/RoomListPage'
-import { NotFoundPlaceholder, TalkPlaceholder } from './pages/Placeholders'
+import TalkPage from './pages/TalkPage'
+import { NotFoundPlaceholder } from './pages/Placeholders'
+
+// ルームごとに別の画面として扱う（ルームIDが変わったら、状態を作り直す）
+function TalkRoute() {
+	const { roomId } = useParams()
+	return <TalkPage key={roomId} talkId={roomId || ''} />
+}
 
 // ★ ルート（仕様書 §6.1）。旧URLとの対応：
 //   index.html → #/login（ログインしていれば #/ へ）  /  app.html → #/  /  talk.html?id=ID → #/talk/ID
@@ -25,8 +32,8 @@ export default function App() {
 				<Route
 					path="/talk/:roomId"
 					element={
-						<RequireAuth page="login">
-							<TalkPlaceholder />
+						<RequireAuth page="talk">
+							<TalkRoute />
 						</RequireAuth>
 					}
 				/>

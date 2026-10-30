@@ -49,9 +49,12 @@ interface Props {
 	percent?: number
 	hidden?: boolean
 	watchStall?: boolean
+	/** 「あとで読み込む」ボタン（トーク画面だけ）。onSkip を渡したときだけ、ボタンの場所ができる。showSkip で表示を切り替える。 */
+	onSkip?: () => void
+	showSkip?: boolean
 }
 
-export function LoadingOverlay({ text, percent, hidden = false, watchStall = false }: Props) {
+export function LoadingOverlay({ text, percent, hidden = false, watchStall = false, onSkip, showSkip = false }: Props) {
 	const [stallText, setStallText] = useState<string | null>(null)
 	const [stalled, setStalled] = useState(false) // 復旧ボタンは、一度出たら残す（既存の attachRecoveryButton と同じ）
 
@@ -90,6 +93,11 @@ export function LoadingOverlay({ text, percent, hidden = false, watchStall = fal
 				<div id="loading-progress-bar" className="loading-progress-bar">
 					<div id="loading-progress-bar-fill" className="loading-progress-bar-fill" style={{ width: `${clamped}%` }}></div>
 				</div>
+			)}
+			{onSkip && (
+				<button id="loading-overlay-skip-button" type="button" className={showSkip ? undefined : 'hidden'} onClick={onSkip}>
+					あとで読み込む
+				</button>
 			)}
 			{stalled && <RecoveryButton />}
 		</div>

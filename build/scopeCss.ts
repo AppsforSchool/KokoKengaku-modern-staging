@@ -125,7 +125,13 @@ const ANIMATION_DECL = /((?:-webkit-)?animation(?:-name)?\s*:)([^;}]*)/gi
  * （宣言の先頭にある「//」だけが対象。url(https://…) のような、途中にある「//」は触らない）
  */
 function dropInvalidSlashDeclarations(body: string): string {
-	return body.replace(/(^|;)(\s*)\/\/[^;]*(;|$)/g, '$1$2')
+	// 「//」の宣言が続くとき（1つ目が「;」まで消えると、2つ目の前の「;」が無くなる）に備えて、変化がなくなるまで繰り返す
+	let current = body
+	for (;;) {
+		const next = current.replace(/(^|;)(\s*)\/\/[^;]*(;|$)/g, '$1$2')
+		if (next === current) return current
+		current = next
+	}
 }
 
 function renameAnimations(body: string, names: Map<string, string>): string {

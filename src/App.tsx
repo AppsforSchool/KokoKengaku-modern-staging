@@ -4,7 +4,7 @@ import { PerfRouteWatcher } from './components/PerfRouteWatcher'
 import LoginPage from './pages/LoginPage'
 import RoomListPage from './pages/RoomListPage'
 import TalkPage from './pages/TalkPage'
-import { NotFoundPlaceholder } from './pages/Placeholders'
+import NotFoundPage from './pages/NotFoundPage'
 
 // ルームごとに別の画面として扱う（ルームIDが変わったら、状態を作り直す）
 function TalkRoute() {
@@ -37,7 +37,7 @@ export default function App() {
 						</RequireAuth>
 					}
 				/>
-				<Route path="*" element={<NotFoundPlaceholder />} />
+				<Route path="*" element={<NotFoundPage />} />
 			</Routes>
 		</>
 	)

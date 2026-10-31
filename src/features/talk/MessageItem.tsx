@@ -4,7 +4,7 @@ import { PollWidget } from './PollWidget'
 import type { MessageView } from './types'
 
 // ★ メッセージ1件の表示（既存の talkScript.js の buildMessageElement と同じHTML構造・クラス）。
-//   ・本文・画像・返信元・既読・アンケート（③）を表示する。編集・転送・選択（④）は、あとの段階で足す。
+//   ・本文・画像・返信元・既読・アンケート（③）、編集・転送・選択（④）を表示する。
 
 const REPLY_MARK = '↩\uFE0E'
 
@@ -19,6 +19,12 @@ interface Props {
 	myUserId: string
 	onVotePoll: (messageId: string, selectedIndex: number, hadMyAnswer: boolean) => Promise<void>
 	onOpenPollVoters: (answerMap: Record<string, unknown>, choiceIndex: number, choiceLabel: string) => void
+	meIsAdmin: boolean
+	/** 一括選択で、このメッセージが選ばれているか。 */
+	selected: boolean
+	onEdit: (view: MessageView) => void
+	onForward: (view: MessageView) => void
+	onToggleSelect: (messageId: string, checked: boolean) => void
 }
 
 /** 未読区切り線（既存の buildUnreadDivider と同じ構造）。 */
@@ -58,12 +64,15 @@ function MessageImage({ src }: { src: string }) {
 	)
 }
 
-function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy, onStartReply, onJump, myUserId, onVotePoll, onOpenPollVoters }: Props) {
+function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy, onStartReply, onJump, myUserId, onVotePoll, onOpenPollVoters, meIsAdmin, selected, onEdit, onForward, onToggleSelect }: Props) {
 	const replyIcon = (
 		<span className="reply-action" title="返信" onClick={() => onStartReply(view.id, view.senderName)}>
 			{REPLY_MARK}
 		</span>
 	)
+
+	// 「編集」「選択」は、管理者、または自分のメッセージだけ。「転送」は、管理者だけ
+	const canEdit = meIsAdmin || view.data.userId === myUserId
 
 	let senderClass = 'clickable-user'
 	if (view.senderIsAdmin) senderClass += ' admin'
@@ -92,6 +101,37 @@ function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy,
 							<span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => onOpenReadBy(view.readBy)}>
 								{`既読:${view.readBy.length}人`}
 							</span>
+							{canEdit && (
+								<>
+									{' '}
+									<span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => onEdit(view)}>
+										編集
+									</span>
+								</>
+							)}
+							{meIsAdmin && (
+								<>
+									{' '}
+									<span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => onForward(view)}>
+										転送
+									</span>
+								</>
+							)}
+							{/* 一括選択用チェックボックス（削除・転送をまとめて行う。選択できる範囲は編集と同じ権限） */}
+							{canEdit && (
+								<>
+									{' '}
+									<label className="message-select-label">
+										<input
+											type="checkbox"
+											className="message-select-checkbox"
+											checked={selected}
+											onChange={(e) => onToggleSelect(view.id, e.target.checked)}
+										/>
+										選択
+									</label>
+								</>
+							)}
 						</p>
 
 						{/* 表示順：送信者・日付など → 返信元のメッセージ → 今回のメッセージ */}

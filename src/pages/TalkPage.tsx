@@ -6,11 +6,15 @@ import { LoadingOverlay } from '../components/LoadingOverlay'
 import { PageShell } from '../components/PageShell'
 import { PushButton } from '../components/PushButton'
 import { clearMessageDraft, loadMessageDraft, saveMessageDraft } from '../features/talk/draft'
+import { EditMessageModal, type EditTarget } from '../features/talk/EditMessageModal'
+import { ForwardModal, type ForwardTarget } from '../features/talk/ForwardModal'
 import { ImageSendModal } from '../features/talk/ImageSendModal'
 import { PollCreateModal } from '../features/talk/PollCreateModal'
 import { PollVotersModal, type PollVotersTarget } from '../features/talk/PollVotersModal'
 import { MessageItem } from '../features/talk/MessageItem'
 import { ReadByModal, type ReadByTarget } from '../features/talk/ReadByModal'
+import { editMessage, fetchMessageDatas, forwardMessagesToRoom, hideMessage, hideMessages, makeForwardItem } from '../features/talk/messageActions'
+import type { MessageView } from '../features/talk/types'
 import { notifyPollAnswer, notifyRoom, sendImageMessage, sendPollMessage, sendTextMessage, votePoll } from '../features/talk/sendMessage'
 import { useTalkRoom, type TalkRoomStart } from '../features/talk/useTalkRoom'
 import { ProfileModal, type ProfileTarget } from '../features/ProfileModal'
@@ -23,8 +27,8 @@ import { useDialog } from '../ui/DialogProvider'
 import { UiSwitchSection } from '../ui/UiSwitchSection'
 
 // ★ トーク画面（既存の talk.html + talkScript.js と同じHTML構造・同じ挙動）。
-//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」「③アンケート（作成・投票・回答者の一覧・通知）」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
-//     ④ 編集・削除・転送・選択  ⑤ メンバー管理・グループのアイコン変更
+//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」「③アンケート（作成・投票・回答者の一覧・通知）」「④編集・削除・転送・選択」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
+//     ⑤ メンバー管理・グループのアイコン変更
 //   ・ユーザー情報の確認 → 通知の初期化（並行）→ ルーム・メンバー情報 → メッセージ → 画像の読み込み待ち → 読み込み画面を閉じる、の順序は、既存と同じ。
 //   ・存在しないルームID：「指定されたトークルームは見つかりませんでした。」→ OKで一覧（#/）へ（既存からの、唯一の意図した挙動の変更）。
 
@@ -61,6 +65,13 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 	const [pollModalOpen, setPollModalOpen] = useState(false)
 	const [pollVotersTarget, setPollVotersTarget] = useState<PollVotersTarget | null>(null)
 	const pollVotersToken = useRef(0)
+	const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
+	const editToken = useRef(0)
+	const [forwardTarget, setForwardTarget] = useState<ForwardTarget | null>(null)
+	const forwardToken = useRef(0)
+	const [selectionMode, setSelectionMode] = useState(false) // 一括選択モード
+	const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set()) // 選択中のメッセージID（画面が再描画されても保持する）
+	const [bulkBusy, setBulkBusy] = useState(false) // まとめて削除の実行中
 	const [messageText, setMessageText] = useState('') // 入力中のメッセージ
 	const [sending, setSending] = useState(false)
 	const messageInputRef = useRef<HTMLTextAreaElement>(null)
@@ -247,6 +258,110 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 		setPollVotersTarget({ answerMap, choiceIndex, choiceLabel, token: pollVotersToken.current })
 	}, [])
 
+	// ---------- 編集・削除 ----------
+	const openEdit = useCallback((view: MessageView) => {
+		editToken.current += 1
+		setEditTarget({
+			messageId: view.id,
+			userId: view.data.userId as string,
+			message: view.data.message as string,
+			time: view.data.time,
+			token: editToken.current,
+		})
+	}, [])
+
+	const handleEditSave = async (messageId: string, newUserId: string, newMessage: string, newTimeValue: string | null) => {
+		try {
+			await editMessage({ talkId, messageId, newUserId, newMessage, newTimeValue, meIsAdmin })
+			await dialog.alert('変更しました。')
+		} catch (error) {
+			await dialog.alert(error instanceof Error ? error.message : String(error))
+			console.error(error)
+		}
+	}
+
+	const handleEditDelete = async (messageId: string) => {
+		if (!(await dialog.confirm('本当に削除しますか？'))) return
+		try {
+			// 実際にdeleteするのではなく、isDisplayをfalseにして非表示化する
+			await hideMessage(talkId, messageId)
+			setEditTarget(null)
+			await dialog.alert('削除しました。')
+		} catch (error) {
+			await dialog.alert(error instanceof Error ? error.message : String(error))
+			console.error(error)
+		}
+	}
+
+	// ---------- 転送（管理者のみ） ----------
+	const openForwardFromView = useCallback((view: MessageView) => {
+		forwardToken.current += 1
+		setForwardTarget({ items: [makeForwardItem(view.data)], token: forwardToken.current })
+	}, [])
+
+	const exitSelectionMode = useCallback(() => {
+		setSelectionMode(false)
+		setSelectedIds(new Set())
+	}, [])
+
+	const handleForwardToRoom = async (targetRoomId: string, items: Record<string, unknown>[]) => {
+		await forwardMessagesToRoom(targetRoomId, items)
+		setForwardTarget(null)
+		exitSelectionMode() // 一括選択から転送した場合は、選択モードも終了しておく
+		await dialog.alert(items.length > 1 ? `${items.length}件のメッセージを転送しました。` : '転送しました。')
+	}
+
+	// ---------- 一括選択・一括削除・一括転送 ----------
+	const toggleSelectionMode = () => {
+		if (selectionMode) exitSelectionMode()
+		else setSelectionMode(true)
+	}
+
+	const toggleSelect = useCallback((messageId: string, checked: boolean) => {
+		setSelectedIds((current) => {
+			const next = new Set(current)
+			if (checked) next.add(messageId)
+			else next.delete(messageId)
+			return next
+		})
+	}, [])
+
+	/** 「まとめて削除」：実際にdeleteするのではなく、isDisplayをfalseにして一括非表示化する。 */
+	const handleBulkDelete = async () => {
+		const count = selectedIds.size
+		if (count === 0) return
+		if (!(await dialog.confirm(`選択した${count}件のメッセージを削除します。よろしいですか？`))) return
+
+		setBulkBusy(true)
+		try {
+			await hideMessages(talkId, Array.from(selectedIds))
+			await dialog.alert(`${count}件のメッセージを削除しました。`)
+			exitSelectionMode()
+		} catch (error) {
+			console.error('一括削除エラー:', error)
+			await dialog.alert('削除に失敗しました。\n' + (error instanceof Error ? error.message : String(error)))
+		} finally {
+			setBulkBusy(false)
+		}
+	}
+
+	/** 「まとめて転送」：選択中のメッセージをまとめて取得し、転送モーダルを開く。 */
+	const handleBulkForward = async () => {
+		if (selectedIds.size === 0) return
+		try {
+			const datas = await fetchMessageDatas(talkId, Array.from(selectedIds))
+			if (datas.length === 0) {
+				await dialog.alert('転送できるメッセージがありませんでした。')
+				return
+			}
+			forwardToken.current += 1
+			setForwardTarget({ items: datas.map(makeForwardItem), token: forwardToken.current })
+		} catch (error) {
+			console.error('転送準備エラー:', error)
+			await dialog.alert('転送するメッセージの取得に失敗しました。\n' + (error instanceof Error ? error.message : String(error)))
+		}
+	}
+
 	const handleMessageChange = (value: string) => {
 		setMessageText(value)
 		saveMessageDraft(talkId, value)
@@ -325,6 +440,9 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 					</div>
 				</div>
 			</div>
+
+			<EditMessageModal target={editTarget} meIsAdmin={meIsAdmin} onClose={() => setEditTarget(null)} onSave={handleEditSave} onDelete={handleEditDelete} />
+			<ForwardModal talkId={talkId} target={forwardTarget} onClose={() => setForwardTarget(null)} onForward={handleForwardToRoom} />
 
 			<ImageSendModal open={imageModalOpen} onClose={() => setImageModalOpen(false)} onSend={handleSendImage} />
 
@@ -411,8 +529,10 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 							{room.header && <Avatar name={room.header.title} imageUrl={room.header.imageUrl} tracker={roomIconTracker} />}
 						</div>
 						<p id="talk-title">{room.header ? room.header.title : 'loading...'}</p>
-						{/* 「選択」（④）と「メンバー」（⑤）は、あとの段階で動くようにする */}
-						<p id="select-mode-button">選択</p>
+						<p id="select-mode-button" onClick={toggleSelectionMode}>
+							{selectionMode ? '選択解除' : '選択'}
+						</p>
+						{/* 「メンバー」（⑤）は、あとの段階で動くようにする */}
 						<p id="member-button">メンバー</p>
 					</div>
 					{/* 問題投稿サイト（意見募集）のトークにだけ、サイトへのリンクバナーを表示する */}
@@ -428,7 +548,7 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 					<p id="talk-loading" className="hidden">
 						loading...
 					</p>
-					<div id="talk-area" className="selection" ref={talkAreaRef}>
+					<div id="talk-area" className={selectionMode ? 'selection selecting' : 'selection'} ref={talkAreaRef}>
 						{room.messagesReady ? (
 							<div>
 								{room.items.map((view) => (
@@ -443,6 +563,11 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 										myUserId={myUserId}
 										onVotePoll={handleVotePoll}
 										onOpenPollVoters={openPollVoters}
+										meIsAdmin={meIsAdmin}
+										selected={selectedIds.has(view.id)}
+										onEdit={openEdit}
+										onForward={openForwardFromView}
+										onToggleSelect={toggleSelect}
 									/>
 								))}
 							</div>
@@ -455,17 +580,25 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 						↓ 元のメッセージにもどる
 					</button>
 
-					{/* 選択モードの操作バー（④） */}
-					<div id="selection-action-bar" className="hidden">
-						<p id="selection-count-text">0件選択中</p>
+					{/* 選択モードの操作バー */}
+					<div id="selection-action-bar" className={selectionMode ? undefined : 'hidden'}>
+						<p id="selection-count-text">{`${selectedIds.size}件選択中`}</p>
 						<div className="selection-action-buttons">
-							<button id="selection-forward-button" className="hidden" disabled>
+							{/* 「まとめて転送」は管理者のみ（転送機能自体が管理者限定のため） */}
+							<button
+								id="selection-forward-button"
+								className={meIsAdmin ? undefined : 'hidden'}
+								disabled={selectedIds.size === 0 || bulkBusy}
+								onClick={() => void handleBulkForward()}
+							>
 								まとめて転送
 							</button>
-							<button id="selection-delete-button" disabled>
+							<button id="selection-delete-button" disabled={selectedIds.size === 0 || bulkBusy} onClick={() => void handleBulkDelete()}>
 								まとめて削除
 							</button>
-							<button id="selection-cancel-button">キャンセル</button>
+							<button id="selection-cancel-button" onClick={exitSelectionMode}>
+								キャンセル
+							</button>
 						</div>
 					</div>
 

@@ -57,6 +57,8 @@ interface Params {
 	onRoomNotFound: () => Promise<void>
 }
 
+let viewSeq = 0 // MessageView を作るたびに増やす番号
+
 const NOT_FOUND_MESSAGE = '指定されたトークルームは見つかりませんでした。'
 
 export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomNotFound }: Params) {
@@ -317,6 +319,7 @@ export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomN
 			const hasText = !!(messageData.message && messageData.message.trim() !== '')
 			return {
 				id: docId,
+				seq: ++viewSeq,
 				isOwn,
 				userId: messageUserId,
 				senderName,

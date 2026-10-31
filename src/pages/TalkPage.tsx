@@ -7,9 +7,11 @@ import { PageShell } from '../components/PageShell'
 import { PushButton } from '../components/PushButton'
 import { clearMessageDraft, loadMessageDraft, saveMessageDraft } from '../features/talk/draft'
 import { ImageSendModal } from '../features/talk/ImageSendModal'
+import { PollCreateModal } from '../features/talk/PollCreateModal'
+import { PollVotersModal, type PollVotersTarget } from '../features/talk/PollVotersModal'
 import { MessageItem } from '../features/talk/MessageItem'
 import { ReadByModal, type ReadByTarget } from '../features/talk/ReadByModal'
-import { notifyRoom, sendImageMessage, sendTextMessage } from '../features/talk/sendMessage'
+import { notifyPollAnswer, notifyRoom, sendImageMessage, sendPollMessage, sendTextMessage, votePoll } from '../features/talk/sendMessage'
 import { useTalkRoom, type TalkRoomStart } from '../features/talk/useTalkRoom'
 import { ProfileModal, type ProfileTarget } from '../features/ProfileModal'
 import { db, doc, getDoc, hedged } from '../firebase'
@@ -21,8 +23,8 @@ import { useDialog } from '../ui/DialogProvider'
 import { UiSwitchSection } from '../ui/UiSwitchSection'
 
 // ★ トーク画面（既存の talk.html + talkScript.js と同じHTML構造・同じ挙動）。
-//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
-//     ③ アンケート  ④ 編集・削除・転送・選択  ⑤ メンバー管理・グループのアイコン変更
+//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」「③アンケート（作成・投票・回答者の一覧・通知）」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
+//     ④ 編集・削除・転送・選択  ⑤ メンバー管理・グループのアイコン変更
 //   ・ユーザー情報の確認 → 通知の初期化（並行）→ ルーム・メンバー情報 → メッセージ → 画像の読み込み待ち → 読み込み画面を閉じる、の順序は、既存と同じ。
 //   ・存在しないルームID：「指定されたトークルームは見つかりませんでした。」→ OKで一覧（#/）へ（既存からの、唯一の意図した挙動の変更）。
 
@@ -56,6 +58,9 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 	const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null) // 返信先
 	const replyToIdRef = useRef<string | null>(null) // 送信の処理が「いま」の返信先を読むための控え（既存の replyToId）
 	const [imageModalOpen, setImageModalOpen] = useState(false)
+	const [pollModalOpen, setPollModalOpen] = useState(false)
+	const [pollVotersTarget, setPollVotersTarget] = useState<PollVotersTarget | null>(null)
+	const pollVotersToken = useRef(0)
 	const [messageText, setMessageText] = useState('') // 入力中のメッセージ
 	const [sending, setSending] = useState(false)
 	const messageInputRef = useRef<HTMLTextAreaElement>(null)
@@ -213,6 +218,35 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 			getMessage: (id) => room.messagesByIdRef.current[id],
 		})
 
+	/** アンケートを送る（失敗したら例外。呼び出し側のモーダルが、ダイアログで知らせる）。 */
+	const handleSendPoll = async (question: string, choices: string[]) => {
+		await sendPollMessage({ talkId, myUserId, question, choices, replyTo: replyToIdRef.current })
+		void notifyThisRoom('📊 ' + question, replyToIdRef.current) // 新着通知（待たない）
+		cancelReply() // 送信成功後は返信状態を解除
+	}
+
+	/** アンケートに回答（または回答を変更）する。全メンバーへの通知は待たない。 */
+	const handleVotePoll = useCallback(
+		async (messageId: string, selectedIndex: number, hadMyAnswer: boolean) => {
+			await votePoll({ talkId, myUserId, messageId, selectedIndex })
+			void notifyPollAnswer({
+				talkId,
+				myUserId,
+				myName: myNameRef.current,
+				roomTitle: room.getNotifyRoomTitle(),
+				memberIds: room.roomMembersRef.current,
+				isChange: hadMyAnswer,
+			})
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[talkId, myUserId],
+	)
+
+	const openPollVoters = useCallback((answerMap: Record<string, unknown>, choiceIndex: number, choiceLabel: string) => {
+		pollVotersToken.current += 1
+		setPollVotersTarget({ answerMap, choiceIndex, choiceLabel, token: pollVotersToken.current })
+	}, [])
+
 	const handleMessageChange = (value: string) => {
 		setMessageText(value)
 		saveMessageDraft(talkId, value)
@@ -293,6 +327,9 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 			</div>
 
 			<ImageSendModal open={imageModalOpen} onClose={() => setImageModalOpen(false)} onSend={handleSendImage} />
+
+			<PollCreateModal open={pollModalOpen} onClose={() => setPollModalOpen(false)} onSubmit={handleSendPoll} />
+			<PollVotersModal target={pollVotersTarget} onClose={() => setPollVotersTarget(null)} onOpenProfile={(userId) => openProfile(userId)} />
 
 			<ReadByModal target={readByTarget} onClose={() => setReadByTarget(null)} onOpenProfile={(userId) => openProfile(userId)} />
 
@@ -403,6 +440,9 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 										onOpenReadBy={openReadBy}
 										onStartReply={startReply}
 										onJump={jumpToMessage}
+										myUserId={myUserId}
+										onVotePoll={handleVotePoll}
+										onOpenPollVoters={openPollVoters}
 									/>
 								))}
 							</div>
@@ -441,8 +481,7 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 							<button id="open-image-modal-button" title="画像を送信" onClick={() => setImageModalOpen(true)}>
 								画像
 							</button>
-							{/* 「質問」（アンケート）は、③で動くようにする */}
-							<button id="open-poll-modal-button" title="アンケートを作成" disabled>
+							<button id="open-poll-modal-button" title="アンケートを作成" onClick={() => setPollModalOpen(true)}>
 								質問
 							</button>
 						</div>

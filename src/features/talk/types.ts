@@ -16,6 +16,8 @@ export interface ReplyContextView {
 
 export interface MessageView {
 	id: string
+	/** 作り直すたびに増える番号（メッセージが変更されたとき、アンケートなどを作り直すための目印）。 */
+	seq: number
 	isOwn: boolean
 	userId: string | undefined
 	senderName: string

@@ -1,9 +1,10 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { Avatar } from '../../components/Avatar'
+import { PollWidget } from './PollWidget'
 import type { MessageView } from './types'
 
 // ★ メッセージ1件の表示（既存の talkScript.js の buildMessageElement と同じHTML構造・クラス）。
-//   ・① では、本文・画像・返信元・既読までを表示する。アンケート（③）、編集・転送・選択（④）は、あとの段階で足す。
+//   ・本文・画像・返信元・既読・アンケート（③）を表示する。編集・転送・選択（④）は、あとの段階で足す。
 
 const REPLY_MARK = '↩\uFE0E'
 
@@ -15,6 +16,9 @@ interface Props {
 	onOpenReadBy: (readBy: string[]) => void
 	onStartReply: (docId: string, senderName: string) => void
 	onJump: (targetId: string) => void
+	myUserId: string
+	onVotePoll: (messageId: string, selectedIndex: number, hadMyAnswer: boolean) => Promise<void>
+	onOpenPollVoters: (answerMap: Record<string, unknown>, choiceIndex: number, choiceLabel: string) => void
 }
 
 /** 未読区切り線（既存の buildUnreadDivider と同じ構造）。 */
@@ -54,7 +58,7 @@ function MessageImage({ src }: { src: string }) {
 	)
 }
 
-function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy, onStartReply, onJump }: Props) {
+function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy, onStartReply, onJump, myUserId, onVotePoll, onOpenPollVoters }: Props) {
 	const replyIcon = (
 		<span className="reply-action" title="返信" onClick={() => onStartReply(view.id, view.senderName)}>
 			{REPLY_MARK}
@@ -116,6 +120,19 @@ function MessageItemBase({ view, showUnreadDivider, onOpenProfile, onOpenReadBy,
 								<p className="message-text">{view.textNode}</p>
 								{replyIcon}
 							</div>
+						)}
+
+						{/* アンケートがあれば、テキストの下にアンケートを表示する */}
+						{Array.isArray(view.data.choices) && view.data.choices.length > 0 && (
+							<PollWidget
+								key={view.seq}
+								messageId={view.id}
+								choices={view.data.choices}
+								answerMap={(view.data.answer as Record<string, unknown>) || {}}
+								myUserId={myUserId}
+								onVote={onVotePoll}
+								onOpenVoters={onOpenPollVoters}
+							/>
 						)}
 
 						{/* テキストが無いメッセージ（画像単独・アンケート単独）にも返信矢印を出す */}

@@ -1,5 +1,5 @@
 import { addDoc, collection, db, doc, serverTimestamp, updateDoc } from '../../firebase'
-import { sendMessageNotification } from '../../lib/push'
+import { sendMessageNotification, sendPushToUsers } from '../../lib/push'
 import { getUserCache } from '../../lib/userCache'
 import { stripTagsToPlainText } from './messageText'
 import type { MessageData } from './types'
@@ -80,5 +80,52 @@ export function notifyRoom(p: NotifyRoomParams): Promise<void> {
 		text: stripTagsToPlainText(p.text), // <link>・<a>・<large> などのタグは、通知には出さず、文字だけを送る
 		replyToUserId,
 		replyToName,
+	})
+}
+
+/** アンケートを送る。質問文は message に、選択肢は choices に、回答は answer（ユーザーID → 選んだ番号）に入る。 */
+export async function sendPollMessage(p: {
+	talkId: string
+	myUserId: string
+	question: string
+	choices: string[]
+	replyTo: string | null
+}): Promise<void> {
+	await addDoc(collection(db, 'KokoKengaku', p.talkId, 'talk'), {
+		userId: p.myUserId,
+		message: p.question,
+		choices: p.choices,
+		answer: {},
+		readBy: [],
+		replyTo: p.replyTo || null,
+		time: serverTimestamp(),
+	})
+	await updateDoc(doc(db, 'KokoKengaku', p.talkId), {
+		lastUpdatedAt: serverTimestamp(),
+	})
+}
+
+/** アンケートに回答（または回答を変更）する。自分の分（answer.{ユーザーID}）だけを書き込む。 */
+export async function votePoll(p: { talkId: string; myUserId: string; messageId: string; selectedIndex: number }): Promise<void> {
+	await updateDoc(doc(db, 'KokoKengaku', p.talkId, 'talk', p.messageId), {
+		[`answer.${p.myUserId}`]: p.selectedIndex,
+	})
+}
+
+/** アンケートに回答（または回答を変更）したことを、トークルームの全メンバー（本人を除く）に通知する。 */
+export function notifyPollAnswer(p: {
+	talkId: string
+	myUserId: string
+	myName: string
+	roomTitle: string
+	memberIds: string[]
+	isChange: boolean
+}): Promise<void> {
+	const name = p.myName
+	return sendPushToUsers(db, {
+		targetIds: (p.memberIds || []).filter((id) => id && id !== p.myUserId),
+		title: p.roomTitle ? `${p.roomTitle}|${name}` : name,
+		body: p.isChange ? `${name}がアンケートの回答を変更しました` : `${name}がアンケートに回答しました`,
+		url: `talk.html?id=${encodeURIComponent(p.talkId)}`,
 	})
 }

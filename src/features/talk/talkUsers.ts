@@ -41,6 +41,7 @@ export function createTalkUsers(talkId: string): TalkUsers {
 					isAdmin: userData.isAdmin || false,
 					imageUrl: userData.imageUrl || '',
 					profileText: userData.profileText || '',
+					no: typeof userData.no === 'number' ? userData.no : undefined,
 					prizeGrantedAt: userData.prizeGrantedAt,
 				})
 

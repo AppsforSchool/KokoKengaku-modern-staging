@@ -7,6 +7,8 @@ export interface UserCacheEntry {
 	isAdmin?: boolean
 	imageUrl?: string
 	profileText?: string
+	/** ユーザーの番号（users_random の no。メンバー一覧の並び順に使う）。なければ undefined。 */
+	no?: number
 	/** 景品を付与した時刻（ミリ秒）。なければ null。 */
 	prizeGrantedAt?: number | null
 }

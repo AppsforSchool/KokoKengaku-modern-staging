@@ -25,7 +25,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # 公開先のパス（base）は、リポジトリ名から決める。
+      #   KokoKengaku-modern-staging → /KokoKengaku-modern-staging/（検証用）
+      #   KokoKengaku-modern-        → /KokoKengaku-modern-/（本番。末尾の「-」まで含む）
       - run: npm run build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

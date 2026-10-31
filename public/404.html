@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>移動中…</title>
+<script>
+  // ★ 存在しないパス（例：…/KokoKengaku-modern-/でたらめ.html）を開いたときに、GitHub Pagesが返す画面。
+  //   サイトのフォルダ（リポジトリ名。例：/KokoKengaku-modern-/）を、アドレスの先頭から取り出し、
+  //   アプリの「見つかりません」の画面（#/404）に移動する。
+  var folder = '/' + (location.pathname.split('/')[1] || '') + '/';
+  location.replace(folder + 'index.html#/404');
+</script>
+</head>
+<body>移動中…</body>
+</html>

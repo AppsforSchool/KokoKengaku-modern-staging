@@ -3,6 +3,7 @@ import { Avatar } from '../../components/Avatar'
 import { getUserCache, hasActivePrize } from '../../lib/userCache'
 
 // ★ メンバー一覧（既存の getMember / renderGroupIconEditor と同じHTML構造・同じ挙動）。
+//   【既存からの変更・ユーザー指示】メンバーは、ユーザーの番号（no）の小さい順に並べる（0が一番上。番号のない人は、最後）。
 //   ・ルームの members に入っている人だけを表示する。名前・アイコン・色（管理者・景品）は、ユーザー情報のキャッシュから。
 //   ・管理者にだけ、「最後に確認した時刻」と、（グループなら）削除ボタンを出す。
 //   ・メンバーの追加・削除は、「管理者」かつ「3人以上のグループ」のときだけ。
@@ -31,6 +32,12 @@ interface Props {
 	confirmRemoveIcon: () => Promise<boolean>
 }
 
+/** ユーザーの番号。なければ、最後に回す。 */
+function memberNo(userId: string): number {
+	const no = (getUserCache(userId) || {}).no
+	return typeof no === 'number' ? no : Infinity
+}
+
 export function MemberModal(props: Props) {
 	const { open, talkId, myUserId, members, lastChecked, meIsAdmin, isGroup, roomTitle, roomImageUrl } = props
 	const fileInputRef = useRef<HTMLInputElement>(null)
@@ -41,6 +48,12 @@ export function MemberModal(props: Props) {
 	// メンバーの追加・削除は「管理者」かつ「グループトーク」のときだけ
 	const canEditMembers = isMeAdmin && members.length >= 3
 	const canEditIcon = meIsAdmin && isGroup
+	// 番号（no）の小さい順（同じ番号・番号なしは、もとの順のまま）
+	const sortedMembers = [...members].sort((a, b) => {
+		const na = memberNo(a)
+		const nb = memberNo(b)
+		return na === nb ? 0 : na < nb ? -1 : 1
+	})
 
 	const saveIcon = async (file: File | null) => {
 		setIconBusy(file ? 'upload' : 'remove')
@@ -114,7 +127,7 @@ export function MemberModal(props: Props) {
 					</button>
 
 					<div id="member-area">
-						{members.map((userId) => {
+						{sortedMembers.map((userId) => {
 							const cached = getUserCache(userId) || {}
 							const memberName = cached.name || '不明なユーザー'
 							const isAdmin = cached.isAdmin || false

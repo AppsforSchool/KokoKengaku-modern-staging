@@ -45,6 +45,8 @@ export interface RoomHeader {
 	imageUrl: string
 	/** メンバー3人以上ならグループ（2人以下は個人トーク）。 */
 	isGroup: boolean
+	/** アイコンを変更するたびに増える（0 は、最初の表示。ヘッダーのアイコンを作り直す目印）。 */
+	iconVersion: number
 }
 
 interface Params {
@@ -227,7 +229,7 @@ export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomN
 				if (partnerId === myUserId) name = `${name}（自分）`
 			}
 			roomTitleRef.current = name
-			setHeader({ title: name, imageUrl, isGroup })
+			setHeader({ title: name, imageUrl, isGroup, iconVersion: 0 })
 		},
 		[],
 	)
@@ -557,6 +559,11 @@ export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomN
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [start])
 
+	/** グループのアイコンを変更したあと、画面上部のアイコンを新しい画像にする。 */
+	const setRoomImageUrl = useCallback((url: string) => {
+		setHeader((current) => (current ? { ...current, imageUrl: url, iconVersion: current.iconVersion + 1 } : current))
+	}, [])
+
 	/** 読み込み画面だけを閉じる（停止中のアカウントのとき）。 */
 	const hideOverlayOnly = useCallback(() => setOverlayHidden(true), [])
 
@@ -568,6 +575,7 @@ export function useTalkRoom({ talkId, start, roomIconTracker, showError, onRoomN
 		showSkip,
 		skipLoading,
 		hideOverlayOnly,
+		setRoomImageUrl,
 		header,
 		items,
 		dividerBeforeId,

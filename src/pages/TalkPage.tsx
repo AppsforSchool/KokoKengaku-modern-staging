@@ -6,9 +6,11 @@ import { LoadingOverlay } from '../components/LoadingOverlay'
 import { PageShell } from '../components/PageShell'
 import { PushButton } from '../components/PushButton'
 import { clearMessageDraft, loadMessageDraft, saveMessageDraft } from '../features/talk/draft'
+import { AddMemberModal } from '../features/talk/AddMemberModal'
 import { EditMessageModal, type EditTarget } from '../features/talk/EditMessageModal'
 import { ForwardModal, type ForwardTarget } from '../features/talk/ForwardModal'
 import { ImageSendModal } from '../features/talk/ImageSendModal'
+import { MemberModal } from '../features/talk/MemberModal'
 import { PollCreateModal } from '../features/talk/PollCreateModal'
 import { PollVotersModal, type PollVotersTarget } from '../features/talk/PollVotersModal'
 import { MessageItem } from '../features/talk/MessageItem'
@@ -18,7 +20,8 @@ import type { MessageView } from '../features/talk/types'
 import { notifyPollAnswer, notifyRoom, sendImageMessage, sendPollMessage, sendTextMessage, votePoll } from '../features/talk/sendMessage'
 import { useTalkRoom, type TalkRoomStart } from '../features/talk/useTalkRoom'
 import { ProfileModal, type ProfileTarget } from '../features/ProfileModal'
-import { db, doc, getDoc, hedged } from '../firebase'
+import { arrayRemove, arrayUnion, db, doc, getDoc, hedged, updateDoc } from '../firebase'
+import { uploadImageToImgbb } from '../lib/imageUpload'
 import { perfMark } from '../lib/perf'
 import { startPush } from '../lib/push'
 import { createImageGroupTracker } from '../lib/statusBadge'
@@ -27,8 +30,7 @@ import { useDialog } from '../ui/DialogProvider'
 import { UiSwitchSection } from '../ui/UiSwitchSection'
 
 // ★ トーク画面（既存の talk.html + talkScript.js と同じHTML構造・同じ挙動）。
-//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」「③アンケート（作成・投票・回答者の一覧・通知）」「④編集・削除・転送・選択」まで。次の機能は、あとの段階で足す（HTMLの場所は、先に作ってある）。
-//     ⑤ メンバー管理・グループのアイコン変更
+//   いまは「①表示と既読」「②送信（本文・返信・画像・下書き・通知）」「③アンケート（作成・投票・回答者の一覧・通知）」「④編集・削除・転送・選択」「⑤メンバー管理・グループのアイコン変更」まで。2b（トーク画面）は、これで完了。
 //   ・ユーザー情報の確認 → 通知の初期化（並行）→ ルーム・メンバー情報 → メッセージ → 画像の読み込み待ち → 読み込み画面を閉じる、の順序は、既存と同じ。
 //   ・存在しないルームID：「指定されたトークルームは見つかりませんでした。」→ OKで一覧（#/）へ（既存からの、唯一の意図した挙動の変更）。
 
@@ -72,6 +74,11 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 	const [selectionMode, setSelectionMode] = useState(false) // 一括選択モード
 	const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set()) // 選択中のメッセージID（画面が再描画されても保持する）
 	const [bulkBusy, setBulkBusy] = useState(false) // まとめて削除の実行中
+	const [memberOpen, setMemberOpen] = useState(false) // メンバー一覧
+	const memberOpenRef = useRef(false)
+	const [, setMembersVersion] = useState(0) // メンバー・ユーザー情報が変わったときに、一覧を描き直すための番号
+	const [addMemberToken, setAddMemberToken] = useState<number | null>(null) // メンバー追加モーダル（開いている間は非 null）
+	const addMemberCount = useRef(0)
 	const [messageText, setMessageText] = useState('') // 入力中のメッセージ
 	const [sending, setSending] = useState(false)
 	const messageInputRef = useRef<HTMLTextAreaElement>(null)
@@ -257,6 +264,70 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 		pollVotersToken.current += 1
 		setPollVotersTarget({ answerMap, choiceIndex, choiceLabel, token: pollVotersToken.current })
 	}, [])
+
+	// ---------- メンバー一覧・メンバーの追加と削除（管理者のみ）・グループのアイコン ----------
+	const refreshMembers = () => setMembersVersion((v) => v + 1)
+
+	const openMemberModal = async () => {
+		memberOpenRef.current = true
+		setMemberOpen(true) // まずキャッシュから、瞬時に一覧を出す
+		refreshMembers()
+		// 常時リスナーを張らないので、開くたびに最新情報へ更新する
+		await room.users.fetchAndCacheUsers(room.roomMembersRef.current, { forceRefresh: true })
+		if (memberOpenRef.current) refreshMembers() // 閉じられていなければ、最新データで描き直す
+	}
+
+	const closeMemberModal = () => {
+		memberOpenRef.current = false
+		setMemberOpen(false)
+	}
+
+	/** メンバーを1人削除する（グループは3人以上なので、3人以下になる削除はできない）。 */
+	const handleRemoveMember = async (userId: string, memberName: string) => {
+		if (room.roomMembersRef.current.length <= 3) {
+			await dialog.alert('グループは3人以上必要なので、これ以上メンバーを削除できません。')
+			return
+		}
+		const ok = await dialog.confirm(`${memberName}をこのグループから削除しますか？`, { okText: '削除する', danger: true })
+		if (!ok) return
+
+		try {
+			await updateDoc(doc(db, 'KokoKengaku', talkId), { members: arrayRemove(userId) })
+			room.roomMembersRef.current = room.roomMembersRef.current.filter((id) => id !== userId)
+			refreshMembers()
+		} catch (error) {
+			console.error('メンバー削除エラー:', error)
+			await dialog.alert('メンバーを削除できませんでした。\n' + (error instanceof Error ? error.message : String(error)))
+		}
+	}
+
+	const openAddMember = () => {
+		addMemberCount.current += 1
+		setAddMemberToken(addMemberCount.current)
+	}
+
+	/** 選ばれた人を、グループに追加する（失敗したら例外。呼び出し側のモーダルが案内を出す）。 */
+	const handleAddMembers = async (ids: string[]) => {
+		await updateDoc(doc(db, 'KokoKengaku', talkId), { members: arrayUnion(...ids) })
+		room.roomMembersRef.current = Array.from(new Set([...room.roomMembersRef.current, ...ids]))
+		setAddMemberToken(null)
+		refreshMembers() // まず一覧を更新
+		// 追加した人の名前・アイコンをキャッシュに入れてから描き直す
+		await room.users.fetchAndCacheUsers(room.roomMembersRef.current, { forceRefresh: true })
+		refreshMembers()
+	}
+
+	/** グループのアイコンを保存する。file が null のときは、画像を削除して頭文字アイコンに戻す。 */
+	const handleSaveGroupIcon = async (file: File | null) => {
+		try {
+			const newUrl = file ? await uploadImageToImgbb(file) : ''
+			await updateDoc(doc(db, 'KokoKengaku', talkId), { imageUrl: newUrl })
+			room.setRoomImageUrl(newUrl) // 画面上部のアイコンとモーダル内のアイコンを更新
+		} catch (error) {
+			console.error('グループアイコンの保存エラー:', error)
+			await dialog.alert('グループアイコンの変更に失敗しました。\n' + (error instanceof Error ? error.message : String(error)))
+		}
+	}
 
 	// ---------- 編集・削除 ----------
 	const openEdit = useCallback((view: MessageView) => {
@@ -449,6 +520,25 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 			<PollCreateModal open={pollModalOpen} onClose={() => setPollModalOpen(false)} onSubmit={handleSendPoll} />
 			<PollVotersModal target={pollVotersTarget} onClose={() => setPollVotersTarget(null)} onOpenProfile={(userId) => openProfile(userId)} />
 
+			<MemberModal
+				open={memberOpen}
+				talkId={talkId}
+				myUserId={myUserId}
+				members={room.roomMembersRef.current}
+				lastChecked={room.users.lastChecked}
+				meIsAdmin={meIsAdmin}
+				isGroup={!!room.header && room.header.isGroup}
+				roomTitle={room.header ? room.header.title : ''}
+				roomImageUrl={room.header ? room.header.imageUrl : ''}
+				onClose={closeMemberModal}
+				onOpenProfile={(userId) => openProfile(userId)}
+				onOpenAddMember={openAddMember}
+				onRemoveMember={(userId, name) => void handleRemoveMember(userId, name)}
+				onSaveGroupIcon={handleSaveGroupIcon}
+				confirmRemoveIcon={() => dialog.confirm('グループアイコンの画像を削除しますか？', { okText: '削除する', danger: true })}
+			/>
+			<AddMemberModal openToken={addMemberToken} members={room.roomMembersRef.current} onClose={() => setAddMemberToken(null)} onAdd={handleAddMembers} />
+
 			<ReadByModal target={readByTarget} onClose={() => setReadByTarget(null)} onOpenProfile={(userId) => openProfile(userId)} />
 
 			<ProfileModal
@@ -526,14 +616,22 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 							←ホームへもどる
 						</button>
 						<div id="talk-title-avatar">
-							{room.header && <Avatar name={room.header.title} imageUrl={room.header.imageUrl} tracker={roomIconTracker} />}
+							{room.header && (
+								<Avatar
+									key={room.header.iconVersion}
+									name={room.header.title}
+									imageUrl={room.header.imageUrl}
+									tracker={room.header.iconVersion === 0 ? roomIconTracker : undefined}
+								/>
+							)}
 						</div>
 						<p id="talk-title">{room.header ? room.header.title : 'loading...'}</p>
 						<p id="select-mode-button" onClick={toggleSelectionMode}>
 							{selectionMode ? '選択解除' : '選択'}
 						</p>
-						{/* 「メンバー」（⑤）は、あとの段階で動くようにする */}
-						<p id="member-button">メンバー</p>
+						<p id="member-button" onClick={() => void openMemberModal()}>
+							メンバー
+						</p>
 					</div>
 					{/* 問題投稿サイト（意見募集）のトークにだけ、サイトへのリンクバナーを表示する */}
 					<a

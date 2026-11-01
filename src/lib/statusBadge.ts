@@ -34,11 +34,28 @@ function injectStyle(): void {
 	document.head.appendChild(style)
 }
 
+// 通知欄を、ヘッダーより下に出す。
+//   #app-header … 全画面のヘッダー（いつも対象）。
+//   #head-area  … トーク画面の、ルーム名・「ホームへもどる」などの行。【SPAで追加】スマホ幅では、アプリのヘッダーのすぐ下に追従して
+//                 （position: sticky）、通知が、その行（「ホームへもどる」）に重なっていたため、追従しているときだけ、その下に出す。
+//                 パソコン幅では、追従せず、通知と重ならないので、従来どおり（アプリのヘッダーの下）。
 function positionStack(): void {
 	if (!stack) return
+	let bottom = 0
 	const header = document.getElementById('app-header')
-	const bottom = header ? Math.max(header.getBoundingClientRect().bottom, 0) : 0
-	stack.style.top = bottom + 8 + 'px'
+	if (header) bottom = Math.max(bottom, header.getBoundingClientRect().bottom)
+	const headArea = document.getElementById('head-area')
+	if (headArea) {
+		const rect = headArea.getBoundingClientRect()
+		const position = getComputedStyle(headArea).position
+		if (rect.height > 0 && (position === 'sticky' || position === 'fixed')) bottom = Math.max(bottom, rect.bottom)
+	}
+	stack.style.top = Math.max(bottom, 0) + 8 + 'px'
+}
+
+/** ヘッダーの位置・大きさ、表示・非表示が変わったときに、通知欄の位置を測り直す。 */
+export function repositionStatusBadges(): void {
+	positionStack()
 }
 
 export function getStatusBadgeStack(): HTMLElement {
@@ -48,6 +65,7 @@ export function getStatusBadgeStack(): HTMLElement {
 	stack.id = 'status-badge-stack'
 	document.body.appendChild(stack)
 	window.addEventListener('resize', positionStack)
+	window.addEventListener('scroll', positionStack, { passive: true }) // トークのヘッダーが、画面のスクロールで動く場合に備える
 	positionStack()
 	return stack
 }

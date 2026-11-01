@@ -24,7 +24,7 @@ import { arrayRemove, arrayUnion, db, doc, getDoc, hedged, updateDoc } from '../
 import { uploadImageToImgbb } from '../lib/imageUpload'
 import { perfMark } from '../lib/perf'
 import { startPush } from '../lib/push'
-import { createImageGroupTracker } from '../lib/statusBadge'
+import { createImageGroupTracker, repositionStatusBadges } from '../lib/statusBadge'
 import { hasActivePrize, resetUserCache, setUserCache, toMillisOrNull } from '../lib/userCache'
 import { useDialog } from '../ui/DialogProvider'
 import { UiSwitchSection } from '../ui/UiSwitchSection'
@@ -114,11 +114,17 @@ export default function TalkPage({ talkId }: { talkId: string }) {
 		resetUserCache() // 既存は、ページを開くたびに、空のキャッシュから始まっていた
 	}, [])
 
+	// 読み込み画面が閉じて、トークのヘッダー（#head-area）が表示されたら、その下に通知を出し直す
+	useEffect(() => {
+		if (room.contentVisible) repositionStatusBadges()
+	}, [room.contentVisible])
+
 	// スマホでヘッダー分の高さを避けて #head-area を固定表示するため、ヘッダーの実測高さを CSS 変数 --header-height に反映する
 	useEffect(() => {
 		const header = document.getElementById('app-header')
 		const update = () => {
 			if (header) document.documentElement.style.setProperty('--header-height', header.offsetHeight + 'px')
+			repositionStatusBadges() // 左上の通知（「計測結果をみる」など）が、トークのヘッダーに重ならないようにする
 		}
 		update()
 		window.addEventListener('resize', update)
